@@ -48,6 +48,8 @@ class MyApp extends StatelessWidget {
 }
 
 class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+
   @override
   _LoginPageState createState() => _LoginPageState();
 }
@@ -114,7 +116,7 @@ class _LoginPageState extends State<LoginPage> {
         }),
       );
 
-      setState(() {
+    setState(() {
         _isLoading = false;
         final data = jsonDecode(response.body);
         if (response.statusCode == 200 && data['success'] == true) {
@@ -162,9 +164,9 @@ class _LoginPageState extends State<LoginPage> {
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
                   SizedBox(height: 20),
                   Image.asset('assets/images/umay_logo.png', height: 200),
                   SizedBox(height: 20),
@@ -433,7 +435,7 @@ class _HomePageState extends State<HomePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+            Text(
                             adSoyad,
                             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                             overflow: TextOverflow.ellipsis,
@@ -442,10 +444,10 @@ class _HomePageState extends State<HomePage> {
                             title,
                             style: TextStyle(fontSize: 13, color: Colors.blueGrey[600]),
                             overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
+            ),
+          ],
+        ),
+      ),
                   ],
                 ),
               ),
