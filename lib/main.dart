@@ -8,6 +8,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/services.dart';
 import 'dart:math';
+import 'dart:async';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 //SERVER IP: 192.168.1.213
@@ -133,9 +134,11 @@ class _LoginPageState extends State<LoginPage> {
           'username': username,
           'password': password,
         }),
-      );
+      ).timeout(Duration(seconds: 5), onTimeout: () {
+        throw TimeoutException('Bağlantı zaman aşımına uğradı');
+      });
 
-    setState(() {
+      setState(() {
         _isLoading = false;
         final data = jsonDecode(response.body);
         if (response.statusCode == 200 && data['success'] == true) {
@@ -157,10 +160,15 @@ class _LoginPageState extends State<LoginPage> {
     } catch (e, stack) {
       setState(() {
         _isLoading = false;
-        if (e.toString().contains('Connection refused') || 
+        if (e is TimeoutException || 
+            e.toString().contains('Connection refused') || 
             e.toString().contains('Failed host lookup') ||
             e.toString().contains('SocketException')) {
-          _errorMessage = 'Server Bağlantısı Başarısız!\nLütfen Tekrar Deneyin';
+          if (_selectedConnectionType == 'Yerel Bağlantı') {
+            _errorMessage = 'Yerel Bağlantı sağlanamadı!\nLütfen Statik Bağlantıyı tercih edin.';
+          } else {
+            _errorMessage = 'Bağlantı hatası!\nLütfen internet bağlantınızı kontrol edin.';
+          }
         } else {
           _errorMessage = 'Bir hata oluştu: $e';
         }
