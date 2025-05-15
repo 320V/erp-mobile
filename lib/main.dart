@@ -125,24 +125,133 @@ class _LoginPageState extends State<LoginPage> {
     final username = _usernameController.text;
     final password = _passwordController.text;
 
+    // Önce yerel bağlantıyı dene
+    bool useLocalConnection = true;
+    
+    // Yerel bağlantı deneniyor bildirimi
+    /*ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              strokeWidth: 2,
+            ),
+            SizedBox(width: 10),
+            Text('Yerel ağ bağlantısı deneniyor...'),
+          ],
+        ),
+        duration: Duration(seconds: 1),
+        backgroundColor: Colors.blue,
+      ),
+    );*/
+
     try {
       final client = createSelfSignedClient();
       final response = await client.post(
-        Uri.parse('$_baseUrl$_loginEndpoint'),
+        Uri.parse('http://192.168.1.213:8887$_loginEndpoint'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'username': username,
           'password': password,
         }),
-      ).timeout(Duration(seconds: 5), onTimeout: () {
-        throw TimeoutException('Bağlantı zaman aşımına uğradı');
+      ).timeout(Duration(seconds: 3), onTimeout: () {
+        useLocalConnection = false;
+        throw TimeoutException('Yerel bağlantı zaman aşımına uğradı');
       });
 
-      setState(() {
-        _isLoading = false;
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success'] == true) {
+        await _saveConnectionPreference(useLocalConnection);
+        
+        // Yerel bağlantı başarılı bildirimi
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 10),
+                Text('Yerel ağ bağlantısı başarılı'),
+              ],
+            ),
+            duration: Duration(seconds: 3),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Giriş başarılı!';
+        });
+        _saveCredentials();
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomePage(
+              user: data['user'],
+            ),
+          ),
+        );
+        return;
+      }
+    } catch (e) {
+      useLocalConnection = false;
+    }
+
+    // Yerel bağlantı başarısız olduysa veya hata verdiyse, statik bağlantıyı dene
+    if (!useLocalConnection) {
+      // Statik bağlantıya geçiş bildirimi
+      /*ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                strokeWidth: 2,
+              ),
+              SizedBox(width: 10),
+              Text('Statik bağlantıya geçiliyor...'),
+            ],
+          ),
+          duration: Duration(seconds: 2),
+          backgroundColor: Colors.orange,
+        ),
+      );*/
+
+      try {
+        final client = createSelfSignedClient();
+        final response = await client.post(
+          Uri.parse('$_fallbackUrl$_loginEndpoint'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'username': username,
+            'password': password,
+          }),
+        ).timeout(Duration(seconds: 5));
+
         final data = jsonDecode(response.body);
         if (response.statusCode == 200 && data['success'] == true) {
-          _errorMessage = 'Giriş başarılı!';
+          await _saveConnectionPreference(false);
+
+          // Statik bağlantı başarılı bildirimi
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 10),
+                  Text('Statik bağlantı başarılı'),
+                ],
+              ),
+              duration: Duration(seconds: 3),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          setState(() {
+            _isLoading = false;
+            _errorMessage = 'Giriş başarılı!';
+          });
           _saveCredentials();
           Navigator.pushReplacement(
             context,
@@ -153,28 +262,23 @@ class _LoginPageState extends State<LoginPage> {
             ),
           );
         } else {
-          _errorMessage = data['message'] ?? 'Giriş başarısız!';
-          debugPrint('Login Error: ' + response.body);
+          setState(() {
+            _isLoading = false;
+            _errorMessage = data['message'] ?? 'Giriş başarısız!';
+          });
         }
-      });
-    } catch (e, stack) {
-      setState(() {
-        _isLoading = false;
-        if (e is TimeoutException || 
-            e.toString().contains('Connection refused') || 
-            e.toString().contains('Failed host lookup') ||
-            e.toString().contains('SocketException')) {
-          if (_selectedConnectionType == 'Yerel Bağlantı') {
-            _errorMessage = 'Yerel Bağlantı sağlanamadı!\nLütfen Statik Bağlantıyı tercih edin.';
-          } else {
-            _errorMessage = 'Bağlantı hatası!\nLütfen internet bağlantınızı kontrol edin.';
-          }
-        } else {
-          _errorMessage = 'Bir hata oluştu: $e';
-        }
-      });
-      debugPrint('Login Exception: $e\n$stack');
+      } catch (e) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Bağlantı hatası! Lütfen internet bağlantınızı kontrol edin.';
+        });
+      }
     }
+  }
+
+  Future<void> _saveConnectionPreference(bool useLocal) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('connectionType', useLocal ? 'Yerel Bağlantı' : 'Statik Bağlantı');
   }
 
   @override
@@ -223,7 +327,6 @@ class _LoginPageState extends State<LoginPage> {
                           setState(() {
                             _rememberMe = value ?? false;
                             if (!_rememberMe) {
-                              // If remember me is unchecked, clear the fields
                               _usernameController.clear();
                               _passwordController.clear();
                             }
@@ -233,42 +336,12 @@ class _LoginPageState extends State<LoginPage> {
                       Text('Beni Hatırla'),
                     ],
                   ),
-                  SizedBox(height: 10),
-                  Center(
-                    child: Container(
-                      width: 200,
-                      padding: EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.blueGrey[200]!),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: DropdownButton<String>(
-                        value: _selectedConnectionType,
-                        isExpanded: true,
-                        underline: SizedBox(),
-                        items: ['Yerel Bağlantı', 'Statik Bağlantı'].map((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                        onChanged: (String? newValue) {
-                          if (newValue != null) {
-                            setState(() {
-                              _selectedConnectionType = newValue;
-                            });
-                            _saveConnectionType();
-                          }
-                        },
-                      ),
-                    ),
-                  ),
                   SizedBox(height: 20),
                   Container(
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: _login,
+                      onPressed: _isLoading ? null : _login,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blueGrey[50],
                         foregroundColor: Colors.blueGrey[800],
@@ -709,8 +782,12 @@ class _StockTrackingPageState extends State<StockTrackingPage> {
   @override
   void initState() {
     super.initState();
-    _loadConnectionType();
-    _fetchProducts();
+    _initializeData();
+  }
+
+  Future<void> _initializeData() async {
+    await _loadConnectionType();
+    await _fetchProducts();
   }
 
   Future<void> _loadConnectionType() async {
@@ -732,7 +809,9 @@ class _StockTrackingPageState extends State<StockTrackingPage> {
       final response = await client.get(
         Uri.parse('$_baseUrl/stok/urun-listesi/'),
         headers: {'Content-Type': 'application/json'},
-      );
+      ).timeout(Duration(seconds: 5), onTimeout: () {
+        throw TimeoutException('Bağlantı zaman aşımına uğradı');
+      });
 
       final data = jsonDecode(response.body);
       
@@ -751,15 +830,15 @@ class _StockTrackingPageState extends State<StockTrackingPage> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        if (e.toString().contains('Connection refused') || 
+        if (e is TimeoutException || 
+            e.toString().contains('Connection refused') || 
             e.toString().contains('Failed host lookup') ||
             e.toString().contains('SocketException')) {
-          _errorMessage = 'Server Bağlantısı Başarısız!\nLütfen Tekrar Deneyin';
-          // Navigate to login page
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => LoginPage()),
-          );
+          if (_baseUrl.contains('192.168.1.213')) {
+            _errorMessage = 'Yerel Bağlantı sağlanamadı!\nLütfen Statik Bağlantıyı tercih edin.';
+          } else {
+            _errorMessage = 'Bağlantı hatası!\nLütfen internet bağlantınızı kontrol edin.';
+          }
         } else {
           _errorMessage = 'Bir hata oluştu: $e';
         }
