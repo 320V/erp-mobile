@@ -56,10 +56,12 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   bool _rememberMe = false;
-  final String _baseUrl = 'http://192.168.1.213:8888';
+  String _baseUrl = 'http://192.168.1.213:8887';
+  final String _fallbackUrl = 'http://212.156.147.234:8887';
   final String _loginEndpoint = '/accounts/api/login/'; 
   bool _isLoading = false;
   String _errorMessage = '';
+  String _selectedConnectionType = 'Yerel Bağlantı';
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
@@ -67,6 +69,23 @@ class _LoginPageState extends State<LoginPage> {
   void initState() {
     super.initState();
     _loadSavedCredentials();
+    _loadConnectionType();
+  }
+
+  Future<void> _loadConnectionType() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _selectedConnectionType = prefs.getString('connectionType') ?? 'Yerel Bağlantı';
+      _baseUrl = _selectedConnectionType == 'Yerel Bağlantı' ? 'http://192.168.1.213:8887' : _fallbackUrl;
+    });
+  }
+
+  Future<void> _saveConnectionType() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('connectionType', _selectedConnectionType);
+    setState(() {
+      _baseUrl = _selectedConnectionType == 'Yerel Bağlantı' ? 'http://192.168.1.213:8887' : _fallbackUrl;
+    });
   }
 
   Future<void> _loadSavedCredentials() async {
@@ -164,9 +183,9 @@ class _LoginPageState extends State<LoginPage> {
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
                   SizedBox(height: 20),
                   Image.asset('assets/images/umay_logo.png', height: 200),
                   SizedBox(height: 20),
@@ -205,6 +224,36 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       Text('Beni Hatırla'),
                     ],
+                  ),
+                  SizedBox(height: 10),
+                  Center(
+                    child: Container(
+                      width: 200,
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.blueGrey[200]!),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: DropdownButton<String>(
+                        value: _selectedConnectionType,
+                        isExpanded: true,
+                        underline: SizedBox(),
+                        items: ['Yerel Bağlantı', 'Statik Bağlantı'].map((String value) {
+                          return DropdownMenuItem<String>(
+                            value: value,
+                            child: Text(value),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          if (newValue != null) {
+                            setState(() {
+                              _selectedConnectionType = newValue;
+                            });
+                            _saveConnectionType();
+                          }
+                        },
+                      ),
+                    ),
                   ),
                   SizedBox(height: 20),
                   Container(
@@ -646,12 +695,22 @@ class _StockTrackingPageState extends State<StockTrackingPage> {
   List<Map<String, dynamic>> _products = [];
   bool _isLoading = true;
   String? _errorMessage;
-  final String _baseUrl = 'http://192.168.1.213:8888';
+  String _baseUrl = 'http://192.168.1.213:8887';
+  final String _fallbackUrl = 'http://212.156.147.234:8887';
 
   @override
   void initState() {
     super.initState();
+    _loadConnectionType();
     _fetchProducts();
+  }
+
+  Future<void> _loadConnectionType() async {
+    final prefs = await SharedPreferences.getInstance();
+    final connectionType = prefs.getString('connectionType') ?? 'Yerel Bağlantı';
+    setState(() {
+      _baseUrl = connectionType == 'Yerel Bağlantı' ? 'http://192.168.1.213:8887' : _fallbackUrl;
+    });
   }
 
   Future<void> _fetchProducts() async {
@@ -996,30 +1055,25 @@ class _StockPageState extends State<StockCikisPage> {
   int _qrIndex = 0;
   String? _qrError;
   bool _isLoading = false;
-  final String _baseUrl = 'http://192.168.1.213:8888';
+  String _baseUrl = 'http://192.168.1.213:8887';
+  final String _fallbackUrl = 'http://212.156.147.234:8887';
 
   @override
   void initState() {
     super.initState();
+    _loadConnectionType();
     // Add listener to the first focus node
     _adetFocusNodes[0].addListener(() => _onAdetFocusChanged(0));
     // Add listener to the first ID controller
     _idControllers[0].addListener(() => _onIdChanged(0));
   }
 
-  @override
-  void dispose() {
-    // Clean up focus nodes and controllers
-    for (var node in _adetFocusNodes) {
-      node.dispose();
-    }
-    for (var controller in _idControllers) {
-      controller.dispose();
-    }
-    for (var controller in _adetControllers) {
-      controller.dispose();
-    }
-    super.dispose();
+  Future<void> _loadConnectionType() async {
+    final prefs = await SharedPreferences.getInstance();
+    final connectionType = prefs.getString('connectionType') ?? 'Yerel Bağlantı';
+    setState(() {
+      _baseUrl = connectionType == 'Yerel Bağlantı' ? 'http://192.168.1.213:8887' : _fallbackUrl;
+    });
   }
 
   void _onIdChanged(int index) {
@@ -1432,30 +1486,25 @@ class _StockGirisPageState extends State<StockGirisPage> {
   int _qrIndex = 0;
   String? _qrError;
   bool _isLoading = false;
-  final String _baseUrl = 'http://192.168.1.213:8888';
+  String _baseUrl = 'http://192.168.1.213:8887';
+  final String _fallbackUrl = 'http://212.156.147.234:8887';
 
   @override
   void initState() {
     super.initState();
+    _loadConnectionType();
     // Add listener to the first focus node
     _adetFocusNodes[0].addListener(() => _onAdetFocusChanged(0));
     // Add listener to the first ID controller
     _idControllers[0].addListener(() => _onIdChanged(0));
   }
 
-  @override
-  void dispose() {
-    // Clean up focus nodes and controllers
-    for (var node in _adetFocusNodes) {
-      node.dispose();
-    }
-    for (var controller in _idControllers) {
-      controller.dispose();
-    }
-    for (var controller in _adetControllers) {
-      controller.dispose();
-    }
-    super.dispose();
+  Future<void> _loadConnectionType() async {
+    final prefs = await SharedPreferences.getInstance();
+    final connectionType = prefs.getString('connectionType') ?? 'Yerel Bağlantı';
+    setState(() {
+      _baseUrl = connectionType == 'Yerel Bağlantı' ? 'http://192.168.1.213:8887' : _fallbackUrl;
+    });
   }
 
   void _onIdChanged(int index) {
