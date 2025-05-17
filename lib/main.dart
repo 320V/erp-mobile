@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'dart:math';
 import 'dart:async';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:flutter/foundation.dart';
 
 //SERVER IP: 192.168.1.213
 
@@ -127,25 +128,6 @@ class _LoginPageState extends State<LoginPage> {
 
     // Önce yerel bağlantıyı dene
     bool useLocalConnection = true;
-    
-    // Yerel bağlantı deneniyor bildirimi
-    /*ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              strokeWidth: 2,
-            ),
-            SizedBox(width: 10),
-            Text('Yerel ağ bağlantısı deneniyor...'),
-          ],
-        ),
-        duration: Duration(seconds: 1),
-        backgroundColor: Colors.blue,
-      ),
-    );*/
-
     try {
       final client = createSelfSignedClient();
       final response = await client.post(
@@ -163,22 +145,6 @@ class _LoginPageState extends State<LoginPage> {
       final data = jsonDecode(response.body);
       if (response.statusCode == 200 && data['success'] == true) {
         await _saveConnectionPreference(useLocalConnection);
-        
-        // Yerel bağlantı başarılı bildirimi
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 10),
-                Text('Yerel ağ bağlantısı başarılı'),
-              ],
-            ),
-            duration: Duration(seconds: 3),
-            backgroundColor: Colors.green,
-          ),
-        );
-
         setState(() {
           _isLoading = false;
           _errorMessage = 'Giriş başarılı!';
@@ -192,32 +158,33 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ),
         );
+        // SnackBar göster
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              useLocalConnection 
+                ? 'Yerel Ağ Bağlantısı ile giriş yapıldı'
+                : 'Statik IP Bağlantısı ile giriş yapıldı',
+              style: TextStyle(color: Colors.white),
+            ),
+            backgroundColor: useLocalConnection ? Colors.green : Colors.blue,
+            duration: Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.all(8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
         return;
       }
     } catch (e) {
       useLocalConnection = false;
+      // Yerel bağlantı başarısız oldu, statik bağlantıya geç
     }
 
     // Yerel bağlantı başarısız olduysa veya hata verdiyse, statik bağlantıyı dene
     if (!useLocalConnection) {
-      // Statik bağlantıya geçiş bildirimi
-      /*ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                strokeWidth: 2,
-              ),
-              SizedBox(width: 10),
-              Text('Statik bağlantıya geçiliyor...'),
-            ],
-          ),
-          duration: Duration(seconds: 2),
-          backgroundColor: Colors.orange,
-        ),
-      );*/
-
       try {
         final client = createSelfSignedClient();
         final response = await client.post(
@@ -229,44 +196,41 @@ class _LoginPageState extends State<LoginPage> {
           }),
         ).timeout(Duration(seconds: 5));
 
-        final data = jsonDecode(response.body);
-        if (response.statusCode == 200 && data['success'] == true) {
-          await _saveConnectionPreference(false);
-
-          // Statik bağlantı başarılı bildirimi
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.white),
-                  SizedBox(width: 10),
-                  Text('Statik bağlantı başarılı'),
-                ],
-              ),
-              duration: Duration(seconds: 3),
-              backgroundColor: Colors.green,
-            ),
-          );
-
-          setState(() {
-            _isLoading = false;
+        setState(() {
+          _isLoading = false;
+          final data = jsonDecode(response.body);
+          if (response.statusCode == 200 && data['success'] == true) {
             _errorMessage = 'Giriş başarılı!';
-          });
-          _saveCredentials();
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => HomePage(
-                user: data['user'],
+            _saveConnectionPreference(false); // Statik bağlantıyı kaydet
+            _saveCredentials();
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HomePage(
+                  user: data['user'],
+                ),
               ),
-            ),
-          );
-        } else {
-          setState(() {
-            _isLoading = false;
+            );
+            // SnackBar göster
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Statik IP Bağlantısı ile giriş yapıldı',
+                  style: TextStyle(color: Colors.white),
+                ),
+                backgroundColor: Colors.blue,
+                duration: Duration(seconds: 3),
+                behavior: SnackBarBehavior.floating,
+                margin: EdgeInsets.all(8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            );
+          } else {
             _errorMessage = data['message'] ?? 'Giriş başarısız!';
-          });
-        }
+          }
+        });
       } catch (e) {
         setState(() {
           _isLoading = false;
@@ -808,10 +772,19 @@ class _StockTrackingPageState extends State<StockTrackingPage> {
       final client = createSelfSignedClient();
       final response = await client.get(
         Uri.parse('$_baseUrl/stok/urun-listesi/'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
       ).timeout(Duration(seconds: 5), onTimeout: () {
         throw TimeoutException('Bağlantı zaman aşımına uğradı');
       });
+
+
+      // Yanıt HTML mi kontrol et
+      if (response.headers['content-type']?.contains('text/html') ?? false) {
+        throw Exception('Sunucu HTML yanıtı döndürdü. API endpoint kontrol edilmeli.');
+      }
 
       final data = jsonDecode(response.body);
       
@@ -839,10 +812,13 @@ class _StockTrackingPageState extends State<StockTrackingPage> {
           } else {
             _errorMessage = 'Bağlantı hatası!\nLütfen internet bağlantınızı kontrol edin.';
           }
+        } else if (e.toString().contains('HTML')) {
+          _errorMessage = 'API yanıtı beklenmeyen formatta.\nLütfen sistem yöneticisi ile iletişime geçin.';
         } else {
           _errorMessage = 'Bir hata oluştu: $e';
         }
       });
+      debugPrint('Fetch Products Error: $e');
     }
   }
 
